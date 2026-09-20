@@ -233,10 +233,10 @@ def main():
         g.get_points()
         
         # 3. Log
-        status_icon = "✅" if "Checkin" in msg else "⚠️"
+        checkin_succeeded = msg.startswith(("Checkin!", "Checkin Repeats!"))
         log(f"用户: {g.email} | 积分: {g.points} | 天数: {g.left_days} | 结果: {msg}")
         
-        if "Checkin" in msg: success_cnt += 1
+        if checkin_succeeded: success_cnt += 1
         
         # 4. Result Formatting
         results.append(f"""

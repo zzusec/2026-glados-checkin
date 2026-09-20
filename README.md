@@ -593,7 +593,7 @@ python3 checkin.py
 **解决方案**：
 
 - **推荐**：使用 cron-job.org（免费、稳定、立即生效）
-- **备选**：启用 Actions 后，由 `checkin.yml` 内置的每月保活任务维护仓库活跃度
+- **备选**：启用 Actions 后，由 `checkin.yml` 内置的每月两次保活任务维护仓库活跃度
 
 相关 GitHub Discussions：
 
@@ -723,7 +723,7 @@ cookie1&cookie2&cookie3
 
 ### 已采取的措施
 
-`checkin.yml` 已内置每月保活任务，会在每月 1 日自动提交时间戳，避免公开仓库因连续 60 天无活动而停用定时工作流。Fork 后仍需先在 Actions 页面启用工作流。
+`checkin.yml` 已内置每月两次保活任务，会在每月 1 日和 15 日自动提交时间戳，降低公开仓库因连续 60 天无活动而停用定时工作流的风险。Fork 后仍需先在 Actions 页面启用工作流。
 
 **因此强烈推荐使用 cron-job.org！** [🔝 查看配置教程](#-推荐方案-cron-joborg-配置定时)
 
