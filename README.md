@@ -647,7 +647,7 @@ GitHub API 要求必须指定分支名。
 </details>
 
 <details>
-<summary><b>Q: 显示 "Checkin Repeats! Please Try Tomorrow" 是什么意思？</b></summary>
+<summary><b>Q: 显示 "Checkin Repeats!" 或 "Today's observation logged" 是什么意思？</b></summary>
 
 这表示**今天已经成功签到过了**！这是正常的成功响应，说明签到功能正常工作。
 

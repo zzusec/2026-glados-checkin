@@ -233,7 +233,11 @@ def main():
         g.get_points()
         
         # 3. Log
-        checkin_succeeded = msg.startswith(("Checkin!", "Checkin Repeats!"))
+        checkin_succeeded = msg.startswith((
+            "Checkin!",
+            "Checkin Repeats!",
+            "Today's observation logged.",
+        ))
         log(f"用户: {g.email} | 积分: {g.points} | 天数: {g.left_days} | 结果: {msg}")
         
         if checkin_succeeded: success_cnt += 1
