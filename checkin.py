@@ -274,5 +274,8 @@ def main():
         if tg_token and tg_chat_id:
             telegram_push(tg_token, tg_chat_id, title, content)
 
+    if success_cnt != len(cookies):
+        sys.exit(1)
+
 if __name__ == '__main__':
     main()

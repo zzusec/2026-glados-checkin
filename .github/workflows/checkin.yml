@@ -6,12 +6,15 @@ on:
     - cron: '30 1 * * *'
     # 北京时间 21:30 (UTC 13:30)
     - cron: '30 13 * * *'
+    # 每月保持仓库活跃，避免公开仓库的定时任务因 60 天无活动被停用
+    - cron: '17 0 1 * *'
   workflow_dispatch:  # 允许手动触发
   push:
     branches: [main]  # 推送时也触发，保持活跃
 
 jobs:
   checkin:
+    if: github.event.schedule != '17 0 1 * *'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -29,19 +32,42 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run Checkin
-        run: python checkin.py
+        run: |
+          for attempt in 1 2; do
+            if python checkin.py; then
+              exit 0
+            fi
+
+            if [ "$attempt" -lt 2 ]; then
+              echo "First attempt failed, retrying in 60s..."
+              sleep 60
+            fi
+          done
+
+          exit 1
         timeout-minutes: 5
         env:
           GLADOS_COOKIE: ${{ secrets.GLADOS_COOKIE }}
           PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
 
-      - name: Retry on Failure
-        if: failure()
+  keep-active:
+    if: github.event_name == 'schedule' && github.event.schedule == '17 0 1 * *'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Update Timestamp
         run: |
-          echo "First attempt failed, retrying in 60s..."
-          sleep 60
-          python checkin.py
-        timeout-minutes: 5
-        env:
-          GLADOS_COOKIE: ${{ secrets.GLADOS_COOKIE }}
-          PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
+          echo "Last active: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" > .github/last-active.txt
+
+      - name: Commit Changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add .github/last-active.txt
+          git diff --staged --quiet || git commit -m "chore: keep repository active [skip ci]"
+          git push
