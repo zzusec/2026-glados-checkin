@@ -254,3 +254,27 @@ git revert e414c36
 ```
 
 注意：回滚会恢复本次已经确认存在的停签和误报问题，除非有替代方案，否则不建议执行。
+
+## 11. 2026-09-27 补充验证
+
+第 8.1 节的保活验证已提前完成，无需等到 2026-10-01：
+
+- 新增 `workflow_dispatch` 的 `task` 输入（`checkin` / `keep-alive`），保活 job 可随时手动复验。
+- 运行 `36298460959`（`workflow_dispatch`，`task=keep-alive`）：`keep-active: success`。
+- 生成提交 `305392f chore: keep repository active [skip ci]`，作者 `github-actions[bot]`。
+- `.github/last-active.txt` 由 `2026-07-08 00:32:03 UTC` 更新为 `2026-09-27 05:52:42 UTC`。
+- 运行 `36298383990`（push 事件）：`checkin` 正常执行、`keep-active` 按设计跳过，确认 `inputs`
+  上下文在非 `workflow_dispatch` 事件下不会导致判断条件求值失败。为降低风险，`checkin` job
+  的判断条件刻意不引用 `inputs`。
+
+同时确认：
+
+- 保活链路（cron 判断、`contents: write`、`GITHUB_TOKEN` 推送）已端到端可用，60 天无活动被停用的
+  风险已实际消除，不再是"待验证"状态。
+
+仍未解决：
+
+- `GLADOS_COOKIE` 自 `2026-09-24 17:54 UTC` 起失效，日志为 `结果: 没有权限`，需重新获取。
+  在更新 Secret 之前，签到会持续以非零退出码失败（这正是 4.3 的预期行为，便于及时发现）。
+- `hx10vip-web/2026-glados-checkin` 是另一个仍停在故障版本 `87a6730` 的 Fork，已开 PR 同步修复。
+
