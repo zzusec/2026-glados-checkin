@@ -8,7 +8,16 @@ on:
     - cron: '30 13 * * *'
     # 每月两次保持仓库活跃，降低公开仓库的定时任务因 60 天无活动被停用的风险
     - cron: '17 0 1,15 * *'
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
+    inputs:
+      task:
+        description: '选择要执行的任务'
+        required: true
+        default: checkin
+        type: choice
+        options:
+          - checkin
+          - keep-alive
   push:
     branches: [main]  # 推送时也触发，保持活跃
 
@@ -50,7 +59,7 @@ jobs:
           PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
 
   keep-active:
-    if: github.event_name == 'schedule' && github.event.schedule == '17 0 1,15 * *'
+    if: (github.event_name == 'schedule' && github.event.schedule == '17 0 1,15 * *') || (github.event_name == 'workflow_dispatch' && inputs.task == 'keep-alive')
     runs-on: ubuntu-latest
     permissions:
       contents: write
