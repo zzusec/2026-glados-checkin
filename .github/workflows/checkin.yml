@@ -55,9 +55,11 @@ jobs:
 
           exit 1
         env:
-          # 每个账号也可以单独一个 secret：checkin.py 会把 GLADOS_COOKIE_2..9 一起读进来
+          # 每个账号一个 secret，checkin.py 会读取 GLADOS_COOKIE 与 GLADOS_COOKIE_2..9。
+          # 加第 4 个账号时，在这里按同样格式再加一行 GLADOS_COOKIE_4 即可。
           GLADOS_COOKIE: ${{ secrets.GLADOS_COOKIE }}
           GLADOS_COOKIE_2: ${{ secrets.GLADOS_COOKIE_2 }}
+          GLADOS_COOKIE_3: ${{ secrets.GLADOS_COOKIE_3 }}
           PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
 
   keep-active:
