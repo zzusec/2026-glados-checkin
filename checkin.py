@@ -77,7 +77,14 @@ def extract_cookie(raw: str):
     return raw
 
 def get_cookies():
-    raw = os.environ.get("GLADOS_COOKIE", "")
+    # 多账号：GLADOS_COOKIE 本身可放多个（换行或 & 分隔）；
+    # 也可用 GLADOS_COOKIE_2 / _3 ... 每个账号单独一个 secret，
+    # 这样某个账号换 Cookie 时无需重新提供其他账号的明文。
+    parts = [os.environ.get("GLADOS_COOKIE", "")]
+    for i in range(2, 10):
+        parts.append(os.environ.get("GLADOS_COOKIE_%d" % i, ""))
+
+    raw = "\n".join(p for p in parts if p.strip())
     if not raw:
         log("❌ 未配置 GLADOS_COOKIE")
         return []
