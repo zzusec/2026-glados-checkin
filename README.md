@@ -238,7 +238,10 @@ GLaDOS 在 2026 年初进行了 API 更新，**绝大多数旧签到脚本已失
 
 ![Cookie-Editor 扩展](images/cookie-extension.png)
 
-> 💡 **提示**：以下任意一个扩展都可以使用，只要能显示 `koa:sess` 和 `koa:sess.sig` 这两个 Cookie 就行！
+> 💡 **提示**：以下任意一个扩展都可以使用，只要能显示 `gld:sess` 和 `gld:sess.sig` 这两个 Cookie 就行！
+>
+> ⚠️ **2026-09 起 GLaDOS 改了会话 Cookie 名**：以前是 `koa:sess` / `koa:sess.sig`，现在**必须用 `gld:sess` / `gld:sess.sig`**。
+> 浏览器里可能仍残留旧的 `koa:sess`，那是历史会话，用它签到只会得到 `没有权限`。
 
 ![可选的 Cookie 扩展](images/cookie-alternative.png)
 
@@ -248,8 +251,14 @@ GLaDOS 在 2026 年初进行了 API 更新，**绝大多数旧签到脚本已失
 2. 进入 **签到页面**（Console → Checkin）
 3. 点击浏览器右上角的 **Cookie-Editor** 扩展图标
 4. 找到并复制这两个值：
-   - `koa:sess` → 一串很长的字符串
-   - `koa:sess.sig` → 一串较短的字符串
+   - `gld:sess` → 一串很长的字符串
+   - `gld:sess.sig` → 一串较短的字符串
+
+> 🖥️ **设备指纹（重要）**：GLaDOS 会把请求的 User-Agent 与会话的**登录设备**做比对，不一致时签到接口会返回
+> `{"code":4,"reason":"device-mismatch"}`，并提示 `Automated check-in detected. Please sign in again to continue.`。
+> 例如会话是在 macOS 上登录的，脚本却发 Windows 的 UA，就会被判定成机器人。
+> 本项目的 `checkin.py` 默认按 **macOS** 发送，并在收到该错误时**自动改用接口返回的登录设备重试一次**；
+> 若你换设备登录，无需改代码，但会自动多一次请求。
 
 ![获取 Cookie](images/glados-cookies.png)
 
@@ -258,13 +267,13 @@ GLaDOS 在 2026 年初进行了 API 更新，**绝大多数旧签到脚本已失
 将两个值按以下格式组合，**注意格式必须完全正确**：
 
 ```text
-koa:sess=你的长字符串; koa:sess.sig=你的短字符串
+gld:sess=你的长字符串; gld:sess.sig=你的短字符串
 ```
 
 **正确示例**：
 
 ```text
-koa:sess=eyJ1c2VySWQiOjEyMzQ1Njc4OTB9; koa:sess.sig=abcdef123456
+gld:sess=WmYz...; gld:sess.sig=abcdef123456
 ```
 
 **常见错误**：

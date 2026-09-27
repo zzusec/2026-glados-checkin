@@ -31,8 +31,19 @@ DOMAINS = [
     "https://glados.network",
 ]
 
+# GLaDOS 会把请求的 User-Agent 与会话的登录设备做比对，不一致时签到接口返回
+# {"code":4,"reason":"device-mismatch","loginDevice":...,"currentDevice":...}
+# 并把结果标成 "Automated check-in detected."。UA 必须与 Cookie 来源设备一致。
+DEVICE_UA = {
+    'macos': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36',
+    'windows': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36',
+}
+
+# 默认按 macOS：当前 Cookie 提取自 macOS 上的 Chrome
+DEFAULT_DEVICE = 'macos'
+
 HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'User-Agent': DEVICE_UA[DEFAULT_DEVICE],
     'Content-Type': 'application/json;charset=UTF-8',
     'Accept': 'application/json, text/plain, */*',
 }
@@ -81,6 +92,7 @@ class GLaDOS:
     def __init__(self, cookie):
         self.cookie = cookie
         self.domain = DOMAINS[0]
+        self.ua = HEADERS['User-Agent']
         self.email = "?"
         self.left_days = "?"
         self.points = "?"
@@ -94,6 +106,7 @@ class GLaDOS:
             try:
                 url = f"{d}{path}"
                 h = HEADERS.copy()
+                h['User-Agent'] = self.ua
                 h['Cookie'] = self.cookie
                 h['Origin'] = d
                 h['Referer'] = f"{d}/console/checkin"
@@ -226,6 +239,13 @@ def main():
         
         # 1. Checkin
         res = g.checkin()
+        # 设备指纹不匹配时，接口会告诉我们会话登录在哪个设备上；换对应 UA 重试一次
+        if res and res.get('reason') == 'device-mismatch':
+            dev = str(res.get('loginDevice', '')).lower()
+            if dev in DEVICE_UA and DEVICE_UA[dev] != g.ua:
+                log(f"⚠️ 设备不匹配（登录设备 {res.get('loginDevice')} / 当前 {res.get('currentDevice')}），改用 {dev} UA 重试")
+                g.ua = DEVICE_UA[dev]
+                res = g.checkin()
         msg = res.get('message', 'Failure') if res else "Network Error"
         
         # 2. Get Info (Refresh data)
