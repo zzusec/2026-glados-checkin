@@ -360,5 +360,55 @@ git revert e414c36
 看返回的 email/userId** 来判断归属，并顺便测试同一账号的不同 Cookie 子集，找出最小可用组合。
 本次即靠此发现 `gld:sess` 为空值的那条是已失效会话。
 
+## 14. 2026-09-27 扩展为三个账号 + 每个账号一个 secret
+
+### 起因
+
+用户指出实际有**三个** GLaDOS 账号（此前只知道两个）。第三个 `hzsinno@gmail.com`
+（userId `734221`）正是第 13 节里那个来路不明的残留 `koa:sess` 会话所属账号。
+
+同时发现：用户在**普通窗口**登录 hzsinno 时，把同一窗口里的 `hx10@vip.qq.com` 顶掉了 ——
+该会话立刻被吊销（`07:00` 的运行里第二个账号变成 `没有权限`）。
+**同一 Cookie 空间内切换账号会吊销前一个会话**，因此 N 个账号需要 N 个互相独立的上下文。
+
+### 关键障碍：secret 是只写的
+
+`GLADOS_COOKIE` 里混着「有效的 yhl5555 + 已失效的 hx10」。要清掉失效项就必须**重写整个 secret**，
+但 GitHub secret 读不回来，所以连 yhl5555 的明文也得重新获取一次。
+**这正是把所有账号挤在一个 secret 里的代价。**
+
+> 注意：仓库是公开的，Actions 日志公开可见，所以**绝不能**用「让脚本把 Cookie 打印到日志」
+> 这类办法去回读 secret（即使转成 base64 也等于公开发布凭据）。
+
+### 改动
+
+- `checkin.py` 的 `get_cookies()` 改为同时读取 `GLADOS_COOKIE` 与 `GLADOS_COOKIE_2..9`，
+  原有换行 / `&` 分隔写法继续兼容。
+- 工作流 `env:` 接线 `GLADOS_COOKIE_2`、`GLADOS_COOKIE_3`。
+
+### 最终状态
+
+| secret | 账号 | userId | 会话形式 |
+| --- | --- | --- | --- |
+| `GLADOS_COOKIE` | yhl5555@gmail.com | 734205 | `gld:sess` + `gld:sess.sig` |
+| `GLADOS_COOKIE_2` | hzsinno@gmail.com | 734221 | 同上 |
+| `GLADOS_COOKIE_3` | hx10@vip.qq.com | 734310 | 同上 |
+
+三个 Cookie 均已逐个打 `/api/user/status` 验证，并在一次真实运行中同时签到成功：
+
+```text
+用户: yhl5555@gmail.com | 积分: 143 | 天数: 404 | Today's observation logged.
+用户: hzsinno@gmail.com | 积分: 56  | 天数: 55  | Checkin! Got 7 Points
+用户: hx10@vip.qq.com   | 积分: 13  | 天数: 35  | Today's observation logged.
+checkin: success
+```
+
+### 提取方式补充
+
+三个账号分布在三个独立上下文里（普通窗口 / 无痕窗口 / 另开的
+`--user-data-dir` Chrome 实例），因此**分别抓了两份 netlog**（主实例与临时实例各一份），
+逐条打接口判定账号归属后再分配 secret。临时实例用独立 `--user-data-dir`，
+既拿到第三个上下文，又让它自己的 netlog 只包含该实例的流量（隐私面更小）。
+
 
 

@@ -152,7 +152,8 @@ GLaDOS 在 2026 年初进行了 API 更新，**绝大多数旧签到脚本已失
 
 | 变量名               | 必填  | 说明                                                                       |
 | -------------------- | ----- | -------------------------------------------------------------------------- |
-| `GLADOS_COOKIE`      | ✅ 是 | GLaDOS 的 Cookie。多个账号请用 `&` 或换行符分隔。                          |
+| `GLADOS_COOKIE`      | ✅ 是 | GLaDOS 的 Cookie（第一个账号）。多个账号见下方 `GLADOS_COOKIE_2..9`。       |
+| `GLADOS_COOKIE_2..9` | ❌ 否 | 第二个及之后的账号，**每个账号单独一个 secret**（推荐）。                    |
 | `PUSHPLUS_TOKEN`     | ❌ 否 | PushPlus 微信推送 Token。                                                  |
 | `TELEGRAM_BOT_TOKEN` | ❌ 否 | Telegram 机器人的 Token（例如 `123456:ABC-DEF1234...`）                    |
 | `TELEGRAM_CHAT_ID`   | ❌ 否 | 接收推送的 Telegram Chat ID                                                |
@@ -262,16 +263,27 @@ GLaDOS 在 2026 年初进行了 API 更新，**绝大多数旧签到脚本已失
 
 > 🚪 **不要登出 GLaDOS（同样重要）**：在浏览器里点"登出"会**立刻吊销该会话**，
 > 自动化正在用的 Cookie 随即失效，日志表现为 `结果: 没有权限`。
-> 需要切换到另一个账号时，请**开一个无痕窗口**（`Cmd+Shift+N`）登录第二个账号 ——
-> 无痕窗口使用独立的 Cookie 空间，两个会话可以同时保持有效。
 > 已经登出过的，必须重新登录并重新导出 Cookie。
+>
+> 🧺 **一个账号一个浏览器上下文**：同一个 Cookie 空间里切换账号会吊销前一个会话。
+> 要同时养 N 个账号，就需要 N 个互相独立的上下文，例如：
+> 普通窗口 + 无痕窗口（`Cmd+Shift+N`）+ 独立 Chrome profile（或另开一个
+> `--user-data-dir` 的 Chrome 实例）。**每个上下文只登一个账号，之后谁都不要登出。**
 
-> 👥 **多账号**：`GLADOS_COOKIE` 支持一次放多个账号，用**换行**或 `&` 分隔即可，一次运行会逐个签到并在推送里分账号展示。
-> 无需为每个账号维护单独的仓库。
+> 👥 **多账号**：**推荐每个账号单独一个 secret** —— `GLADOS_COOKIE`、`GLADOS_COOKIE_2`、`GLADOS_COOKIE_3` …
+> 一次运行会逐个签到，并在推送里分账号展示。
+>
 > ```
-> gld:sess=账号A的长串; gld:sess.sig=账号A的短串
-> gld:sess=账号B的长串; gld:sess.sig=账号B的短串
+> GLADOS_COOKIE     = 账号A的 Cookie
+> GLADOS_COOKIE_2   = 账号B的 Cookie
 > ```
+>
+> 为什么推荐分开：**GitHub secret 是只写的，读不回来**。如果所有账号挤在一个 secret 里，
+> 某个账号的 Cookie 失效时，你必须重新提供**全部**账号的明文才能重建它。
+> 分开之后，哪个失效就只改哪个。
+>
+> （仍然兼容老写法：`GLADOS_COOKIE` 里用**换行**或 `&` 放多个账号也行。加第 4 个账号时，
+> 除了新建 secret，还要在 `.github/workflows/checkin.yml` 的 `env:` 里按同样格式加一行 `GLADOS_COOKIE_4`。）
 
 ![获取 Cookie](images/glados-cookies.png)
 
