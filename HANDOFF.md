@@ -278,3 +278,52 @@ git revert e414c36
   在更新 Secret 之前，签到会持续以非零退出码失败（这正是 4.3 的预期行为，便于及时发现）。
 - `hx10vip-web/2026-glados-checkin` 是另一个仍停在故障版本 `87a6730` 的 Fork，已开 PR 同步修复。
 
+## 12. 2026-09-27 第二次故障：会话 Cookie 改名 + 设备指纹
+
+### 现象
+
+- 2026-09-24 17:54 UTC 起所有 schedule 运行变红，日志 `结果: 没有权限`。
+- 与 Cookie 是否过期无关：浏览器里的会话仍然有效。
+
+### 根因（两个独立原因，必须同时修）
+
+1. **GLaDOS 把会话 Cookie 从 `koa:sess` 改名为 `gld:sess`。**
+   浏览器里仍残留旧的 `koa:sess`，那是**另一个账号**（userId `734221`）的历史会话；
+   当前账号 `yhl5555@gmail.com` 是 userId `734205`，走 `gld:sess`。
+   只发 `koa:sess` 一律得到 `{"code":-2,"message":"没有权限"}`。
+   这解释了为什么故障**恰好发生在 9/24**：改名当天所有旧的 `koa:sess` secret 同时失效。
+2. **新增设备指纹比对。** `checkin.py` 一直发 Windows 的 User-Agent，
+   而该会话的登录设备是 macOS，于是签到接口返回：
+
+   ```json
+   {"code":4,"reason":"device-mismatch","loginDevice":"macOS","currentDevice":"Windows",
+    "message":"Automated check-in detected. Please sign in again to continue."}
+   ```
+
+### 修复
+
+- 默认 UA 改为与登录设备一致的 macOS。
+- 收到 `device-mismatch` 时，按接口返回的 `loginDevice` 换 UA **自动重试一次**，换设备登录后无需改代码。
+- README 更正 Cookie 名为 `gld:sess` / `gld:sess.sig`，并补充设备指纹说明。
+
+### 验证
+
+- 本机对照实验：Windows UA → `code:4`；macOS UA → `code:0, points:5, "Checkin! Got 5 Points", streak:1`（138 → 143 分）。
+- 本机 `python3 checkin.py` 退出码 0；故意注入 Windows UA 时自动重试并成功。
+- GitHub Actions 运行 `36299889019`：`checkin: success`，`用户: yhl5555@gmail.com | 积分: 143 | 天数: 404`。
+
+### 本机提取 Cookie 的可行路径（供下次换 Cookie 参考）
+
+不可行的路：Chrome 136+ 禁止对**默认 profile** 开远程调试（`--remote-debugging-port` 会被静默忽略，
+把 profile 目录做符号链接给 `--user-data-dir` 也会被识别）；macOS 的 TCC 同时挡住了直接读 Chrome profile 目录，
+即使关闭工具沙箱也是 `Operation not permitted`。`document.cookie` 为空——会话 Cookie 是 HttpOnly。
+
+可行路径：用 `--log-net-log=/tmp/netlog.json --net-log-capture-mode=IncludeSensitive` 启动 Chrome，
+访问 `glados.cloud/console/checkin`，再从 netlog 中提取。
+注意两点：
+
+1. netlog 含**全量**流量（含其他站点凭据），用完必须立刻退出 Chrome 并删除文件；
+2. Cookie 头里 `koa:sess` 与 `gld:sess` **同时存在**，必须按名字取 `gld:sess`，
+   否则会取到另一个账号的旧会话。
+
+
