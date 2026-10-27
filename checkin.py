@@ -429,7 +429,8 @@ def pushplus(token, title, content):
         return False
 
 def telegram_push(token, chat_id, title, content):
-    if not token or not chat_id: return
+    if not token or not chat_id:
+        return False
     try:
         import re
         url = f"https://api.telegram.org/bot{token}/sendMessage"
@@ -469,10 +470,15 @@ def telegram_push(token, chat_id, title, content):
         if resp.status_code != 200:
             log(f"❌ Telegram 推送失败: HTTP {resp.status_code}")
             return False
+        payload = resp.json()
+        if not isinstance(payload, dict) or payload.get('ok') is not True:
+            log("❌ Telegram 推送失败: API 未确认发送成功")
+            return False
         log("✅ Telegram 推送成功")
         return True
     except (requests.RequestException, ValueError) as e:
-        log(f"❌ Telegram 推送失败: {e}")
+        # Telegram request URLs contain the bot token; never log exceptions verbatim.
+        log(f"❌ Telegram 推送失败: {type(e).__name__}")
         return False
 
 def diagnose_accounts(cookies):
