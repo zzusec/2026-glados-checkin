@@ -468,7 +468,19 @@ def telegram_push(token, chat_id, title, content):
         }
         resp = requests.post(url, json=data, timeout=10)
         if resp.status_code != 200:
-            log(f"❌ Telegram 推送失败: HTTP {resp.status_code}")
+            try:
+                payload = resp.json()
+            except ValueError:
+                payload = {}
+            description = str(payload.get('description', '')).lower() if isinstance(payload, dict) else ''
+            # Log only known labels, never arbitrary API text or token-bearing URLs.
+            reason = next((label for label in (
+                'chat not found', 'chat_id is empty', "can't parse entities",
+                'message is too long', 'bot was blocked by the user',
+                "bot can't initiate conversation with a user",
+            ) if label in description), '')
+            detail = f' ({reason})' if reason else ''
+            log(f"❌ Telegram 推送失败: HTTP {resp.status_code}{detail}")
             return False
         payload = resp.json()
         if not isinstance(payload, dict) or payload.get('ok') is not True:

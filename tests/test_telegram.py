@@ -49,7 +49,31 @@ class TelegramPushTests(unittest.TestCase):
 
         self.assertIn('HTTP 403', str(log.call_args_list))
         self.assertNotIn(TOKEN, str(log.call_args_list))
-        post.return_value.json.assert_not_called()
+        post.return_value.json.assert_called_once_with()
+
+    @mock.patch('checkin.log')
+    @mock.patch('checkin.requests.post')
+    def test_known_api_error_is_classified_without_logging_private_text(self, post, log):
+        post.return_value = mock.Mock(status_code=400)
+        post.return_value.json.return_value = {'description': f'Bad Request: chat not found {TOKEN}'}
+
+        self.assertFalse(checkin.telegram_push(TOKEN, CHAT_ID, 'Test', 'Body'))
+
+        printed = str(log.call_args_list)
+        self.assertIn('HTTP 400 (chat not found)', printed)
+        self.assertNotIn(TOKEN, printed)
+        self.assertNotIn('Bad Request:', printed)
+
+    @mock.patch('checkin.log')
+    @mock.patch('checkin.requests.post')
+    def test_http_error_with_invalid_json_preserves_http_status(self, post, log):
+        post.return_value = mock.Mock(status_code=400)
+        post.return_value.json.side_effect = ValueError(TOKEN)
+
+        self.assertFalse(checkin.telegram_push(TOKEN, CHAT_ID, 'Test', 'Body'))
+
+        self.assertIn('HTTP 400', str(log.call_args_list))
+        self.assertNotIn(TOKEN, str(log.call_args_list))
 
     @mock.patch('checkin.log')
     @mock.patch('checkin.requests.post')
