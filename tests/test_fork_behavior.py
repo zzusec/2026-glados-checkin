@@ -206,8 +206,8 @@ class WorkflowContractTests(unittest.TestCase):
             self.assertIn(f'{name}: ${{{{ secrets.{name} }}}}', workflow)
         self.assertIn("GLADOS_EXPECTED_ACCOUNTS: '3'", workflow)
         self.assertIn("EXCHANGE_PLAN: ${{ vars.EXCHANGE_PLAN || 'off' }}", workflow)
-        self.assertIn("cron: '30 1 * * *'", workflow)
-        self.assertIn("cron: '30 13 * * *'", workflow)
+        self.assertIn("cron: '30 2 * * *'", workflow)
+        self.assertIn("cron: '30 10 * * *'", workflow)
 
 
 if __name__ == '__main__':
