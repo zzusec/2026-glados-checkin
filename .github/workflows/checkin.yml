@@ -2,8 +2,9 @@ name: GLaDOS 2026 Checkin
 
 on:
   schedule:
-    # 北京时间 09:30（UTC 01:30）。一天一次即可，脚本会在失败时自动重试。
+    # 北京时间 09:30、21:30；第二次运行也可补偿临时网络故障。
     - cron: '30 1 * * *'
+    - cron: '30 13 * * *'
   workflow_dispatch:
     inputs:
       dispatch_source:
@@ -54,6 +55,9 @@ jobs:
         timeout-minutes: 8
         env:
           GLADOS_COOKIE: ${{ secrets.GLADOS_COOKIE }}
+          GLADOS_COOKIE_2: ${{ secrets.GLADOS_COOKIE_2 }}
+          GLADOS_COOKIE_3: ${{ secrets.GLADOS_COOKIE_3 }}
+          GLADOS_EXPECTED_ACCOUNTS: '3'
           # Must match the browser that created the current gld:sess.
           GLADOS_USER_AGENT: ${{ vars.GLADOS_USER_AGENT }}
           CHECKIN_DIAGNOSTIC_ONLY: ${{ inputs.diagnose_only && 'true' || 'false' }}
@@ -61,6 +65,6 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           PUSH_LEVEL: ${{ vars.PUSH_LEVEL || 'fail_only' }}
-          EXCHANGE_PLAN: ${{ vars.EXCHANGE_PLAN || 'plan500' }}
+          EXCHANGE_PLAN: ${{ vars.EXCHANGE_PLAN || 'off' }}
           CHECKIN_MAX_ATTEMPTS: '3'
           CHECKIN_RETRY_DELAY_SECONDS: '60'

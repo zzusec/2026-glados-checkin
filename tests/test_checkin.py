@@ -229,8 +229,12 @@ class FakeGLaDOS:
 
 
 class ExchangePlanTests(unittest.TestCase):
-    def test_defaults_to_plan500(self):
+    def test_defaults_to_no_exchange(self):
         with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertIsNone(checkin.get_exchange_plan())
+
+    def test_explicit_plan500_enables_exchange(self):
+        with mock.patch.dict(os.environ, {'EXCHANGE_PLAN': 'plan500'}):
             self.assertEqual(checkin.get_exchange_plan(), 'plan500')
 
     def test_off_disables_exchange(self):

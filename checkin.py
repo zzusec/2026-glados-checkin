@@ -6,7 +6,7 @@
 功能：
 - 全自动签到
 - 精准获取当前积分 (Points)
-- 积分达标自动兑换会员天数（默认 500 分兑换 100 天，可配置/关闭）
+- 积分达标自动兑换会员天数（默认关闭，可配置开启）
 - PushPlus 微信推送（包含积分、剩余天数、签到结果、兑换结果）
 - 智能多域名切换 (优先 glados.cloud)
 - 支持 Cookie-Editor 导出格式
@@ -36,10 +36,19 @@ DOMAINS = [
 ]
 
 DEFAULT_USER_AGENT = (
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
     'AppleWebKit/537.36 (KHTML, like Gecko) '
-    'Chrome/120.0.0.0 Safari/537.36'
+    'Chrome/154.0.0.0 Safari/537.36'
 )
+
+DEVICE_USER_AGENTS = {
+    'macos': DEFAULT_USER_AGENT,
+    'windows': (
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+        'AppleWebKit/537.36 (KHTML, like Gecko) '
+        'Chrome/154.0.0.0 Safari/537.36'
+    ),
+}
 
 HEADERS = {
     'Content-Type': 'application/json;charset=UTF-8',
@@ -57,8 +66,7 @@ NORMAL_CHECKIN_MESSAGES = (
 )
 
 # 积分兑换计划 (#11)：消耗 points 积分兑换 days 天会员。
-# 通过环境变量 EXCHANGE_PLAN 选择，默认 plan500（500 分兑换 100 天），
-# 设为 off 关闭自动兑换。
+# 通过环境变量 EXCHANGE_PLAN 显式开启，默认 off，不自动消耗积分。
 EXCHANGE_PLANS = {
     "plan100": {"points": 100, "days": 10},
     "plan200": {"points": 200, "days": 30},
@@ -136,25 +144,35 @@ def get_session_cookie_kind(cookie_header):
     return None
 
 def get_cookies():
-    raw = os.environ.get("GLADOS_COOKIE", "")
-    if not raw:
+    cookies = []
+    for name in ('GLADOS_COOKIE', *(f'GLADOS_COOKIE_{i}' for i in range(2, 10))):
+        raw = os.environ.get(name, '').strip()
+        if not raw:
+            continue
+
+        # Parse each Secret independently so formatted JSON stays one account.
+        if raw.startswith(('{', '[')):
+            cookie = extract_cookie(raw)
+            if cookie:
+                cookies.append(cookie)
+            else:
+                log(f'❌ {name} 的 JSON Cookie 无效')
+            continue
+
+        cookies.extend(
+            cookie for item in re.split(r'[\r\n&]+', raw)
+            if (cookie := extract_cookie(item))
+        )
+
+    if not cookies:
         log("❌ 未配置 GLADOS_COOKIE")
-        return []
-
-    # A Cookie-Editor export is one JSON document. Its formatting newlines
-    # and ampersands inside values are not account separators.
-    if raw.lstrip().startswith(('{', '[')):
-        cookie = extract_cookie(raw)
-        return [cookie] if cookie else []
-    
-    # Split by enter or &
-    sep = '\n' if '\n' in raw else '&'
-    return [cookie for item in raw.split(sep) if (cookie := extract_cookie(item))]
+    return cookies
 
 
-def get_browser_headers():
+def get_browser_headers(user_agent=None):
     """Build headers matching the browser that created the login session."""
-    user_agent = os.environ.get("GLADOS_USER_AGENT", "").strip() or DEFAULT_USER_AGENT
+    if user_agent is None:
+        user_agent = os.environ.get("GLADOS_USER_AGENT", "").strip() or DEFAULT_USER_AGENT
     headers = {'User-Agent': user_agent}
 
     chrome = re.search(r'(?:Chrome|Chromium)/(\d+)', user_agent)
@@ -243,6 +261,8 @@ def checkin_with_retry(client, attempts=3, delay_seconds=60):
 class GLaDOS:
     def __init__(self, cookie):
         self.cookie = cookie
+        self.user_agent = os.environ.get('GLADOS_USER_AGENT', '').strip() or DEFAULT_USER_AGENT
+        self.device_corrected = False
         self.domain = DOMAINS[0]
         self.email = "?"
         self.left_days = "?"
@@ -264,7 +284,7 @@ class GLaDOS:
             try:
                 url = f"{d}{path}"
                 h = HEADERS.copy()
-                h.update(get_browser_headers())
+                h.update(get_browser_headers(self.user_agent))
                 h['Cookie'] = self.cookie
                 h['Origin'] = d
                 h['Referer'] = f"{d}/console/checkin"
@@ -332,7 +352,16 @@ class GLaDOS:
 
     def checkin(self):
         """执行签到"""
-        return self.req('POST', '/api/user/checkin', {'token': 'glados.cloud'})
+        result = self.req('POST', '/api/user/checkin', {'token': 'glados.cloud'})
+        if isinstance(result, dict) and result.get('reason') == 'device-mismatch':
+            device = str(result.get('loginDevice', '')).strip().lower()
+            user_agent = DEVICE_USER_AGENTS.get(device)
+            if not self.device_corrected and user_agent and user_agent != self.user_agent:
+                self.device_corrected = True
+                self.user_agent = user_agent
+                log(f'⚠️ 按会话登录设备 {device} 更正 UA，重试一次')
+                return self.req('POST', '/api/user/checkin', {'token': 'glados.cloud'})
+        return result
 
     def exchange(self, plan):
         """兑换会员天数：表单提交 planType (plan100/plan200/plan500)"""
@@ -342,7 +371,7 @@ class GLaDOS:
 
 def get_exchange_plan():
     """读取自动兑换配置，返回计划 ID；关闭或无效时返回 None"""
-    raw = os.environ.get("EXCHANGE_PLAN", "plan500").strip().lower()
+    raw = os.environ.get("EXCHANGE_PLAN", "off").strip().lower()
     if raw in EXCHANGE_DISABLED_VALUES:
         return None
     if raw in EXCHANGE_PLANS:
@@ -478,6 +507,12 @@ def main():
     cookies = get_cookies()
     if not cookies:
         return 1
+
+    expected_accounts = int(os.environ.get('GLADOS_EXPECTED_ACCOUNTS', '0'))
+    if expected_accounts and len(cookies) != expected_accounts:
+        log(f'❌ 预期 {expected_accounts} 个账号，实际读取 {len(cookies)} 个，请检查 Secret 配置')
+        return 1
+    log(f'已读取 {len(cookies)} 个账号')
 
     if os.environ.get('CHECKIN_DIAGNOSTIC_ONLY', '').strip().lower() in ('1', 'true', 'yes'):
         return diagnose_accounts(cookies)
